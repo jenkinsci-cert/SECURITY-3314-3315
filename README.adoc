@@ -1,0 +1,75 @@
+= SECURITY-3314/SECURITY-3315 Mitigation
+
+This repository documents mitigations preventing exploitation of SECURITY-3314 and SECURITY-3315 on affected instances.
+
+== Overview
+
+Access to the CLI needs to be disabled.
+Both of the following steps must be taken:
+
+* Remove the CLI HTTP endpoint
+* Disable the SSH Port (https://plugins.jenkins.io/sshd/[SSH Server Plugin])
+
+[NOTE]
+====
+The remoting-based CLI has been removed from Jenkins https://www.jenkins.io/blog/2019/02/17/remoting-cli-removed/[five years ago].
+Related instructions are not included in this documentation.
+Administrators of Jenkins instances with remoting-based CLI are strongly advised to urgently upgrade to more recent releases.
+====
+
+[IMPORTANT]
+====
+The instructions below are only intended as a short-term workaround, even if you do not use the CLI.
+Due to Jenkins's extensibility, it is possible that other ways to navigate to the affected HTTP endpoint exist.
+====
+
+== Instructions
+
+=== Disable the CLI endpoint
+
+If Jenkins is currently running, execute the provided script `disable-cli.groovy` in the https://www.jenkins.io/doc/book/managing/script-console/[Script Console].
+Doing so will remove the CLI HTTP endpoint until Jenkins is restarted.
+Create a Post-Initialization https://www.jenkins.io/doc/book/managing/groovy-hook-scripts/[Groovy Hook Script] with the contents of `disable-cli.groovy` to ensure the script is executed whenever Jenkins is (re)started.
+
+==== Confirmation
+
+To confirm the script worked, navigate to _Manage Jenkins » Jenkins CLI_.
+
+Without the mitigation applied, general CLI documentation including an overview of available CLI commands is shown.
+With the mitigation applied, an HTTP 404 Not Found error is shown.
+
+=== Disable the SSH Port
+
+The https://plugins.jenkins.io/sshd/[SSH Server Plugin] provides access to the Jenkins CLI via SSH.
+This is a plugin whose functionality used to be part of Jenkins core, so it may be installed even if you've never explicitly installed it.
+
+Navigate to _Manage Jenkins » Security_ and ensure that the _SSHD Port_ setting in the _SSH Server_ section is set to _Disable_.
+
+NOTE: Doing this is recommended even if you choose to disable or uninstall the plugin, as plugin management functionality may reinstall or re-enable the plugin to ensure plugin dependencies are satisfied.
+
+Alternatively, you can add the following snippet to the end of the `disable-cli.groovy` script:
+
+```groovy
+// Disable CLI access over SSH Server Plugin
+if (j.getPlugin('sshd')) {
+  hudson.ExtensionList.lookupSingleton(org.jenkinsci.main.modules.sshd.SSHD.class).setPort(-1)
+}
+```
+
+==== Confirmation
+
+No explicit configuration is necessary with the supported UI option to disable the SSH Port, but you can attempt to connect to the previously configured SSH CLI port.
+The expected outcome is a failure to establish a connection.
+Note that no unauthenticated use of the SSH CLI is possible, so not every error is an indication of it being successfully disabled.
+These are examples of an expected (safe) result (assuming port `2222` was previously configured):
+
+```bash
+$ ssh -p 2222 jenkins.example.org
+ssh: connect to host jenkins.example.org port 2222: Connection refused
+```
+
+```bash
+$ ssh -p 2222 jenkins.example.org
+kex_exchange_identification: read: Connection reset by peer
+Connection reset by … port 2222
+```
