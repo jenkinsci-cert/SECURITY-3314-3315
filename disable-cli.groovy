@@ -24,7 +24,7 @@ THE SOFTWARE.
 
 // Disable CLI access over HTTP
 def removal = { lst ->
-  lst.each { x -> if (x.getClass().name?.contains("CLIAction")) lst.remove(x) }
+  lst.each { x -> if (x.getClass().getName()?.contains("CLIAction")) lst.remove(x) }
 }
 def j = jenkins.model.Jenkins.get();
 removal(j.getExtensionList(hudson.cli.CLIAction.class))
